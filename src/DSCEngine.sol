@@ -73,11 +73,7 @@ contract DSCEngine is ReentrancyGuard {
     /////////////////
     //  Functions  //
     /////////////////
-    constructor(
-        address[] memory tokenAddresses,
-        address[] memory priceFeedAddresses, 
-        address dscAddress
-        ) {
+    constructor(address[] memory tokenAddresses, address[] memory priceFeedAddresses, address dscAddress) {
         if (tokenAddresses.length != priceFeedAddresses.length) {
             revert DSCEngine__TokenAddressLengthAndPriceFeedAddressLengthMustBeSame();
         }
@@ -91,16 +87,23 @@ contract DSCEngine is ReentrancyGuard {
     //////////////////////////
     //  EXTERNAL Functions  //
     //////////////////////////
-    function depositCollateralAndMintDsc() external {}
+    function depositCollateralAndMintDsc(
+        address tokenCollateralAddress,
+        uint256 amountCollateral,
+        uint256 amountDscToMint
+    ) external {
+        depositCollateral(tokenCollateralAddress, amountCollateral);
+        mintDsc(amountDscToMint);
+    }
 
     /*
-         * @param tokenCollateralAddress: The ERC20 token address of the collateral you're depositing
-         * @param amountCollateral: The amount of collateral you're depositing
-         * @param amountDscToMint: The amount of DSC you want to mint
-         * @notice This function will deposit your collateral and mint DSC in one transaction
+     * @param tokenCollateralAddress: The ERC20 token address of the collateral you're depositing
+     * @param amountCollateral: The amount of collateral you're depositing
+     * @param amountDscToMint: The amount of DSC you want to mint
+     * @notice This function will deposit your collateral and mint DSC in one transaction
      */
     function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral)
-        external
+        public
         moreThenZero(amountCollateral)
         isAllowedToken(tokenCollateralAddress)
         nonReentrant
@@ -116,9 +119,9 @@ contract DSCEngine is ReentrancyGuard {
     function redeemCollateral() external {}
 
     /*
-        * @param amountDscToMint: The amount of DSC you want to mint
-        * You can only mint DSC if you have enough collateral
-    */
+     * @param amountDscToMint: The amount of DSC you want to mint
+     * You can only mint DSC if you have enough collateral
+     */
     function mintDsc(uint256 amountDscToMint) external moreThenZero(amountDscToMint) nonReentrant {
         sDscMinted[msg.sender] += amountDscToMint;
         //If they dont have that much, that they minted then revert

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: SEE LICENSE IN LICENSE
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 import {Script} from "forge-std/Script.sol";
@@ -22,9 +22,9 @@ contract HelperConfig is Script {
     NetworkConfig public activeNetworkConfig;
 
     constructor() {
-        if(block.chainid == 11155111){
+        if (block.chainid == 11155111) {
             activeNetworkConfig = getSepoliaEthConfig();
-        }else{
+        } else {
             activeNetworkConfig = getOrCreateAnvilEthConfig();
         }
     }

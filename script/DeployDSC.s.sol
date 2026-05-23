@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: SEE LICENSE IN LICENSE
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
 import {Script} from "forge-std/Script.sol";
@@ -12,7 +12,8 @@ contract DeployDSC is Script {
 
     function run() external returns (DecentralizedStableCoin, DSCEngine, HelperConfig) {
         HelperConfig config = new HelperConfig();
-        (address wethUsdPriceFeed, address wbtcUsdPriceFeed, address weth, address wbtc,uint256 deployerKey) = config.activeNetworkConfig();
+        (address wethUsdPriceFeed, address wbtcUsdPriceFeed, address weth, address wbtc, uint256 deployerKey) =
+            config.activeNetworkConfig();
 
         tokenAddresses = [weth, wbtc];
         priceFeedAddresses = [wethUsdPriceFeed, wbtcUsdPriceFeed];
