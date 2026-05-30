@@ -36,6 +36,7 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__TransferFailed();
     error DSCEngine__BreakHealthFactor(uint256 userHealthFactor);
     error DSCEngine__MintFailed();
+    error DSCEngine__HealthFactorOk();
 
     /////////////////////
     // State variables //
@@ -44,7 +45,7 @@ contract DSCEngine is ReentrancyGuard {
     uint256 private constant PRECISION = 1e18;
     uint256 private constant LIQUIDATION_THRESHOLD = 50; //200% over collateralised
     uint256 private constant LIQUIDATION_PRECISION = 100;
-    uint256 private constant MIN_HEALTH_FACTOR = 1;
+    uint256 private constant MIN_HEALTH_FACTOR = 1e18;
 
     mapping(address token => address priceFeed) private sPriceFeed; //tokenToPriceFeed
     mapping(address user => mapping(address token => uint256 amount)) private sCollateralDeposited;
@@ -115,7 +116,9 @@ contract DSCEngine is ReentrancyGuard {
         if (!sucess) revert DSCEngine__TransferFailed();
     }
 
-    function redeemCollateralForDsc(address tokenCollateralAddress, uint256 amountCollateral, uint256 amountDscToBurn) external {
+    function redeemCollateralForDsc(address tokenCollateralAddress, uint256 amountCollateral, uint256 amountDscToBurn)
+        external
+    {
         burnDsc(amountDscToBurn);
         redeemCollateral(tokenCollateralAddress, amountCollateral);
     }
@@ -148,16 +151,34 @@ contract DSCEngine is ReentrancyGuard {
         if (!minted) revert DSCEngine__MintFailed();
     }
 
-    function burnDsc(uint256 amount) public moreThenZero(amount){
+    function burnDsc(uint256 amount) public moreThenZero(amount) {
         sDscMinted[msg.sender] -= amount;
-        bool sucess = i_dsc.transferFrom(msg.sender, address(this), amount);
-        if(!sucess) revert DSCEngine__TransferFailed();
-        i_dsc.burn(amount);
+        bool sucess = I_DSC.transferFrom(msg.sender, address(this), amount);
+        if (!sucess) revert DSCEngine__TransferFailed();
+        I_DSC.burn(amount);
         _revertIfHealthFactorBroken(msg.sender);
     }
 
-    function liquidate() external {
-        
+    /**
+     * @notice Liquidates an undercollateralized position by covering part of the user's debt.
+     * @param collateral The ERC20 collateral token to seize during liquidation.
+     * @param user The address of the user being liquidated.
+     * @param debtToCover The amount of DSC debt to repay on behalf of the user.
+     * follow CEI: Checks, Effects, Interactions
+     */
+    function liquidate(address collateral, address user, uint256 debtToCover) external {
+        //need to check health factor of uesr
+        uint256 startingUserHealthFactor = _healthFactor(user);
+        if (startingUserHealthFactor >= MIN_HEALTH_FACTOR) {
+            revert DSCEngine__HealthFactorOk();
+        }
+
+        //we want to burn DSC debt
+        // And take their collateral
+        //Bad user: $140 eth -> $100  : 140/100 * 100 = < 150% collateralized
+        //debtToCover = 100$
+        //$100 of DSC = ??? $of ETH
+        uint256 getTokenAmountFromDebtCovered = getTokenAmountFromUsd(collateral, debtToCover);
     }
 
     function getHealthFactor() external view {}
@@ -202,6 +223,27 @@ contract DSCEngine is ReentrancyGuard {
     //////////////////////////
     //    Public Functions  //
     //////////////////////////
+
+    //uint256 usdAmountInWei -> is in the form of wei: $2 = 2e18;
+    //in this conteact we are doing every maths in 1e18
+    function getTokenAmountFromUsd(address token, uint256 usdAmountInWei) public view returns (uint256) {
+        AggregatorV3Interface feed = AggregatorV3Interface(sPriceFeed[token]);
+        (, int256 price,,,) = feed.latestRoundData();
+        //To preserve the 1e18, we * PRECISION to make it 1e36
+
+        // We multiply by PRECISION (1e18) to avoid losing precision during division.
+        // This temporarily scales numerator to 1e36 precision.
+
+        // price from Chainlink already has 1e8 precision.
+        // Example: $29 => 29e8
+
+        // To normalize price to 1e18 precision,
+        // we multiply by ADDITIONAL_FEED_PRECISION (1e10).
+        return (usdAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION);//To preserve the 1e18, we * PRECISION to make it 1e36
+        //Give the 10% bonus to the collateral
+        
+    }
+
     function getAccountCollateralValue(address user) public view returns (uint256 collateralValueInUsd) {
         for (uint256 i = 0; i < sCollateralTokens.length; i++) {
             address token = sCollateralTokens[i];
