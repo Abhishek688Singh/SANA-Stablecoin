@@ -1,0 +1,2 @@
+DSCEngineTest:testGetUsdValue() (gas: 25186)
+DSCEngineTest:testRevertIfCollateralZero() (gas: 43380)
