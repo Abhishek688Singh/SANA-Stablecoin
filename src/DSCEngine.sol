@@ -79,6 +79,12 @@ contract DSCEngine is ReentrancyGuard {
     /////////////////
     //  Functions  //
     /////////////////
+    /**
+     * @notice Initialize the engine with allowed collateral tokens and their price feeds.
+     * @param tokenAddresses List of collateral token addresses allowed by the engine.
+     * @param priceFeedAddresses Corresponding Chainlink price feed addresses for each token.
+     * @param dscAddress The address of the DecentralizedStableCoin token contract.
+     */
     constructor(address[] memory tokenAddresses, address[] memory priceFeedAddresses, address dscAddress) {
         if (tokenAddresses.length != priceFeedAddresses.length) {
             revert DSCEngine__TokenAddressLengthAndPriceFeedAddressLengthMustBeSame();
@@ -120,6 +126,12 @@ contract DSCEngine is ReentrancyGuard {
         if (!success) revert DSCEngine__TransferFailed();
     }
 
+    /**
+     * @notice Burn DSC to redeem collateral in a single transaction.
+     * @param tokenCollateralAddress The ERC20 token address of the collateral to redeem.
+     * @param amountCollateral The amount of collateral to redeem (in token's smallest unit).
+     * @param amountDscToBurn The amount of DSC to burn to enable the redemption (in 1e18 precision).
+     */
     function redeemCollateralForDsc(address tokenCollateralAddress, uint256 amountCollateral, uint256 amountDscToBurn)
         external
     {
@@ -129,6 +141,11 @@ contract DSCEngine is ReentrancyGuard {
 
     //In order to redeem collateral
     //Health factor  must be above 1 after redeeming
+    /**
+     * @notice Redeem `amountCollateral` of `tokenCollateralAddress` previously deposited by the caller.
+     * @param tokenCollateralAddress The ERC20 token address to redeem.
+     * @param amountCollateral The amount to redeem (in token's smallest unit).
+     */
     function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral)
         public
         moreThenZero(amountCollateral)
@@ -202,6 +219,11 @@ contract DSCEngine is ReentrancyGuard {
     /*
      * @dev Low-level internal function, do not call unless the function calling it is
      * checking for health factors being broken
+
+     * @dev Decrement `onBehalfOf` minted DSC accounting, transfer DSC from `dscFrom`, and burn it.
+     * @param amountDscToBurn Amount of DSC to burn (in 1e18 precision).
+     * @param onBehalfOf The address whose minted accounting is decremented.
+     * @param dscFrom The address providing DSC for burning (must have approved this contract).
      */
     function _burnDsc(uint256 amountDscToBurn, address onBehalfOf, address dscFrom) private {
         sDscMinted[onBehalfOf] -= amountDscToBurn;
@@ -210,6 +232,13 @@ contract DSCEngine is ReentrancyGuard {
         I_DSC.burn(amountDscToBurn);
     }
 
+    /**
+     * @dev Internal transfer of collateral from `from` to `to` and update storage.
+     * @param from The address whose collateral balance will be reduced.
+     * @param to The address that will receive the collateral tokens.
+     * @param tokenCollateralAddress ERC20 token address of the collateral.
+     * @param amountCollateral Amount of collateral to transfer (in token's smallest unit).
+     */
     function _redeemCollateral( address from, address to, address tokenCollateralAddress, uint256 amountCollateral)
         private
     {

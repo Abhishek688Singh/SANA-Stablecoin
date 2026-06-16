@@ -14,6 +14,7 @@ contract DSCEngineTest is Test {
     DSCEngine dsce;
     HelperConfig config;
     address ethUsdPriceFeed;
+    address btcUsdPriceFeed;
     address weth;
     address wbtc;
     address public nitesh = makeAddr("NITESH");
@@ -23,9 +24,25 @@ contract DSCEngineTest is Test {
     function setUp() public {
         deployer = new DeployDSC();
         (dsc, dsce, config) = deployer.run();
-        (ethUsdPriceFeed,, weth,,) = config.activeNetworkConfig();
+        (ethUsdPriceFeed,btcUsdPriceFeed, weth,,) = config.activeNetworkConfig();
         ERC20Mock(weth).mint(nitesh, STARTING_ERC20_BALANCE);
     }
+
+    ////////////////////////////
+    //    Constructor test    //
+    ////////////////////////////
+    address [] public tokenAddresses;
+    address[] public priceFeedAddresses;
+    function testRevertIfTokenLengthDosentMatchPriceFeedLength() public {
+        tokenAddresses.push(weth);
+
+        priceFeedAddresses.push(ethUsdPriceFeed);
+        priceFeedAddresses.push(btcUsdPriceFeed);
+
+        vm.expectRevert(DSCEngine.DSCEngine__TokenAddressLengthAndPriceFeedAddressLengthMustBeSame.selector);
+        new DSCEngine(tokenAddresses, priceFeedAddresses, address(dsc));
+    }
+
 
     ///////////////////////
     //    price test     //
@@ -36,6 +53,13 @@ contract DSCEngineTest is Test {
         uint256 expectedValue = 30000e18;
         uint256 actualUsd = dsce.getUsdValue(weth, ethAmount);
         assertEq(expectedValue, actualUsd);
+    }
+
+    function testGetTokenAmountFromUsd() public view{
+        uint256 usdAmountInWei = 200e18;
+        uint256 expectedAmount = 1e17;
+        uint256 amount = dsce.getTokenAmountFromUsd(weth, usdAmountInWei);
+        assertEq(amount, expectedAmount);
     }
 
     ///////////////////////////////////
