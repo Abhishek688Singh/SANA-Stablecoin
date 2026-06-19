@@ -202,14 +202,17 @@ contract DSCEngine is ReentrancyGuard {
         uint256 totalCollateralToRedeem = tokenAmountFromDebtCovered + bonusCollateral;
         _redeemCollateral(user, msg.sender, collateral, totalCollateralToRedeem);
         //burnDsc
-        _burnDsc(debtToCover, user,msg.sender);
+        _burnDsc(debtToCover, user, msg.sender);
 
         uint256 endingUserHealthFactor = _healthFactor(user);
-        if(endingUserHealthFactor < startingUserHealthFactor){
+        if (endingUserHealthFactor < startingUserHealthFactor) {
             revert DSCEngine__HealthFactorNotImproved();
         }
         _revertIfHealthFactorBroken(msg.sender);
-        
+    }
+
+    function getAccountInformation(address user) external view returns (uint256 totalDscMinted, uint256 collateralValueInUsd) {
+        return _getAccountInformation(user);
     }
 
     //////////////////////////////////////
@@ -239,7 +242,7 @@ contract DSCEngine is ReentrancyGuard {
      * @param tokenCollateralAddress ERC20 token address of the collateral.
      * @param amountCollateral Amount of collateral to transfer (in token's smallest unit).
      */
-    function _redeemCollateral( address from, address to, address tokenCollateralAddress, uint256 amountCollateral)
+    function _redeemCollateral(address from, address to, address tokenCollateralAddress, uint256 amountCollateral)
         private
     {
         sCollateralDeposited[from][tokenCollateralAddress] -= amountCollateral;
@@ -273,6 +276,11 @@ contract DSCEngine is ReentrancyGuard {
         return (collateeralAdjustedForThreshold * PRECISION) / totalDscMinted;
     }
 
+    // Named return variables: explicit `return (...)` is optional.
+    // Solidity named return variables:
+    // `totalDscMinted` and `collateralValueInUsd` are declared in the
+    // `returns(...)` clause. Assigning values to them is enough;
+    // Solidity automatically returns them at the end of the function.
     function _getAccountInformation(address user)
         private
         view

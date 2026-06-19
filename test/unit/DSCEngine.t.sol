@@ -8,6 +8,9 @@ import {DSCEngine} from "src/DSCEngine.sol";
 import {HelperConfig} from "script/HelperConfig.s.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 
+// test name pattern
+// test<Action>Reverts<Condition>
+
 contract DSCEngineTest is Test {
     DeployDSC deployer;
     DecentralizedStableCoin dsc;
@@ -24,15 +27,16 @@ contract DSCEngineTest is Test {
     function setUp() public {
         deployer = new DeployDSC();
         (dsc, dsce, config) = deployer.run();
-        (ethUsdPriceFeed,btcUsdPriceFeed, weth,,) = config.activeNetworkConfig();
+        (ethUsdPriceFeed, btcUsdPriceFeed, weth,,) = config.activeNetworkConfig();
         ERC20Mock(weth).mint(nitesh, STARTING_ERC20_BALANCE);
     }
 
     ////////////////////////////
     //    Constructor test    //
     ////////////////////////////
-    address [] public tokenAddresses;
+    address[] public tokenAddresses;
     address[] public priceFeedAddresses;
+
     function testRevertIfTokenLengthDosentMatchPriceFeedLength() public {
         tokenAddresses.push(weth);
 
@@ -42,7 +46,6 @@ contract DSCEngineTest is Test {
         vm.expectRevert(DSCEngine.DSCEngine__TokenAddressLengthAndPriceFeedAddressLengthMustBeSame.selector);
         new DSCEngine(tokenAddresses, priceFeedAddresses, address(dsc));
     }
-
 
     ///////////////////////
     //    price test     //
@@ -55,7 +58,7 @@ contract DSCEngineTest is Test {
         assertEq(expectedValue, actualUsd);
     }
 
-    function testGetTokenAmountFromUsd() public view{
+    function testGetTokenAmountFromUsd() public view {
         uint256 usdAmountInWei = 200e18;
         uint256 expectedAmount = 1e17;
         uint256 amount = dsce.getTokenAmountFromUsd(weth, usdAmountInWei);
@@ -72,5 +75,32 @@ contract DSCEngineTest is Test {
         vm.expectRevert(DSCEngine.DSCEngine__NeedsMoreThenZero.selector);
         dsce.depositCollateral(nitesh, 0);
         vm.stopPrank();
+    }
+
+    //this test uses latest version of openzeppelin/openzeppelin-contracts
+    function testDepositCollateralRevertsForUnsupportedToken() public {
+        ERC20Mock ranToken = new ERC20Mock();
+        vm.startPrank(nitesh);
+        vm.expectRevert(DSCEngine.DSCEngine__NotAllowedToken.selector);
+        dsce.depositCollateral(address(ranToken), STARTING_BALANCE);
+        vm.stopPrank();
+    }
+
+    modifier depositCollateral() {
+        vm.startPrank(nitesh);
+        ERC20Mock(weth).approve(address(dsce), STARTING_BALANCE);
+        dsce.depositCollateral(weth, STARTING_BALANCE);
+        vm.stopPrank();
+        _;
+    }
+
+    function testDepositCollateralAndGetAccountInfo() public depositCollateral {
+        (uint256 totalDscMinted, uint256 collateralValueInUsd) = dsce.getAccountInformation(nitesh);
+
+        uint256 expectedTotalDscMinted = 0;
+        uint256 expectedDepositedAmount = dsce.getTokenAmountFromUsd(weth, collateralValueInUsd);
+
+        assertEq(totalDscMinted, expectedTotalDscMinted);
+        assertEq(STARTING_BALANCE, expectedDepositedAmount);
     }
 }
