@@ -23,6 +23,17 @@ contract DSCEngineTest is Test {
     address public nitesh = makeAddr("NITESH");
     uint256 public constant STARTING_BALANCE = 20 ether;
     uint256 public constant STARTING_ERC20_BALANCE = 20 ether;
+    /*
+    - Deposit 10 WETH.
+    - Mint 1000 DSC.
+
+    Both use 18 decimals, so using ether as a denomination for the numeric literal is completely fine because:
+
+    1000 ether == 1000e18
+
+    Even though the variable represents DSC and not ETH, ether in Solidity is just a multiplier of 10^18.
+        */
+    uint256 public constant MINT_DSC = 20;
 
     function setUp() public {
         deployer = new DeployDSC();
@@ -102,5 +113,22 @@ contract DSCEngineTest is Test {
 
         assertEq(totalDscMinted, expectedTotalDscMinted);
         assertEq(STARTING_BALANCE, expectedDepositedAmount);
+    }
+
+    ///////////////////////////////////
+    //      MintCollateral test      //
+    ///////////////////////////////////
+    function testCantMintWithoutDepositCollateral() public {
+        // Do NOT deposit collateral; do NOT approve anything.
+        // Try to mint — should revert because health factor will be broken.
+        // With 0 collateral, the health factor will be 0
+        vm.startPrank(nitesh);
+
+        uint256 expectedHealthFactor = dsce.calculateHealthFactor(MINT_DSC, 0);
+
+        vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCEngine__BreakHealthFactor.selector, expectedHealthFactor));
+        dsce.mintDsc(MINT_DSC);
+
+        vm.stopPrank();
     }
 }

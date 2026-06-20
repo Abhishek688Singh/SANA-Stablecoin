@@ -161,7 +161,7 @@ contract DSCEngine is ReentrancyGuard {
      */
     function mintDsc(uint256 amountDscToMint) public moreThenZero(amountDscToMint) nonReentrant {
         sDscMinted[msg.sender] += amountDscToMint;
-        //If they dont have that much, that they minted then revert
+        //If they dont have that much, then they minted and revert
         _revertIfHealthFactorBroken(msg.sender);
 
         bool minted = I_DSC.mint(msg.sender, amountDscToMint);
@@ -211,7 +211,11 @@ contract DSCEngine is ReentrancyGuard {
         _revertIfHealthFactorBroken(msg.sender);
     }
 
-    function getAccountInformation(address user) external view returns (uint256 totalDscMinted, uint256 collateralValueInUsd) {
+    function getAccountInformation(address user)
+        external
+        view
+        returns (uint256 totalDscMinted, uint256 collateralValueInUsd)
+    {
         return _getAccountInformation(user);
     }
 
@@ -270,10 +274,24 @@ contract DSCEngine is ReentrancyGuard {
         }
     }
 
-    function _healthFactor(address user) internal view returns (uint256) {
+    function _healthFactor(address user) private view returns (uint256) {
         (uint256 totalDscMinted, uint256 collateralValueInUsd) = _getAccountInformation(user);
-        uint256 collateeralAdjustedForThreshold = (collateralValueInUsd * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
-        return (collateeralAdjustedForThreshold * PRECISION) / totalDscMinted;
+
+        return _calculateHealthFactor(totalDscMinted, collateralValueInUsd);
+    }
+
+    function _calculateHealthFactor(uint256 totalDscMinted, uint256 collateralValueInUsd)
+        internal
+        pure
+        returns (uint256)
+    {
+        // If user has minted 0 DSC, health factor is considered infinite.
+        // Returning max uint256 prevents division by zero panic (Panic: 0x12).
+        if (totalDscMinted == 0) {
+            return type(uint256).max; //is equivalent to: 2^256 - 1 (MOX NUMBER IN SOLIDITY)
+        }
+        uint256 collateralAdjustedForThreshold = (collateralValueInUsd * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
+        return (collateralAdjustedForThreshold * PRECISION) / totalDscMinted;
     }
 
     // Named return variables: explicit `return (...)` is optional.
@@ -326,5 +344,22 @@ contract DSCEngine is ReentrancyGuard {
         (, int256 price,,,) = priceFeed.latestRoundData();
 
         return (((uint256(price) * ADDITIONAL_FEED_PRECISION) * amount) / PRECISION);
+    }
+
+    ///////////////////////////////////
+    //        Getter functions       //
+    ///////////////////////////////////
+
+    //This function is used to get health factor with custom params
+    function calculateHealthFactor(uint256 totalDscMinted, uint256 collateralValueInUsd)
+        external
+        pure
+        returns (uint256 healthFactor)
+    {
+        return _calculateHealthFactor(totalDscMinted, collateralValueInUsd);
+    }
+
+    function getHealthFactor(address user) external view returns (uint256 healthFactor) {
+        return _healthFactor(user);
     }
 }
