@@ -33,7 +33,9 @@ contract DSCEngineTest is Test {
 
     Even though the variable represents DSC and not ETH, ether in Solidity is just a multiplier of 10^18.
         */
-    uint256 public constant MINT_DSC = 20;
+    uint256 public constant MINT_DSC = 20 ether;
+    uint256 public constant AMOUNT_COLLATERAl = 20 ether;
+    uint256 public constant AMOUNT_DSC_TO_MINT = 20 ether;
 
     function setUp() public {
         deployer = new DeployDSC();
@@ -122,13 +124,37 @@ contract DSCEngineTest is Test {
         // Do NOT deposit collateral; do NOT approve anything.
         // Try to mint — should revert because health factor will be broken.
         // With 0 collateral, the health factor will be 0
-        vm.startPrank(nitesh);
+        // vm.startPrank(nitesh);
 
         uint256 expectedHealthFactor = dsce.calculateHealthFactor(MINT_DSC, 0);
 
         vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCEngine__BreakHealthFactor.selector, expectedHealthFactor));
         dsce.mintDsc(MINT_DSC);
 
+        // vm.stopPrank();
+    }
+
+    /**
+     * Make every other condition valid.
+     *
+     * Break only the condition you want to test.
+     */
+    function testMintWithZeroRevertsNeedsMoreThenZero() public {
+        vm.startPrank(nitesh);
+        //Arrange
+        //{is2}
+        // I allow address(dsce) to spend up to MINT_DSC amount of (weth/wbtc) my tokens from my wallet.
+        ERC20Mock(weth).approve(address(dsce), MINT_DSC);
+
+        //We first run this to prevent some health factor issues {is3}
+        dsce.depositCollateralAndMintDsc(weth, AMOUNT_COLLATERAl, AMOUNT_DSC_TO_MINT);
+
+        //Act + Assert
+        vm.expectRevert(DSCEngine.DSCEngine__NeedsMoreThenZero.selector);
+        dsce.mintDsc(0);
+
         vm.stopPrank();
     }
+
+    // TODO: increase the test coverage upto 85%
 }
