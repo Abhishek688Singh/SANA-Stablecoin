@@ -1,9 +1,13 @@
 // // SPDX-License-Identifier: MIT
 
-// // Have our invariant aka properties
-// // What are our invariants?
 // // 1. The total supply of DSC should be less than the total value of collateral
 // // 2. Getter view functions should never revert <- evergreen invariant
+
+// // Invariants:
+// // protocol must never be insolvent / undercollateralized
+// // TODO: users cant create stablecoins with a bad health factor
+// // TODO: a user should only be able to be liquidated if they have a bad health factor
+
 
 // pragma solidity ^0.8.19;
 
@@ -15,14 +19,15 @@
 // import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
 // import { StdInvariant } from "forge-std/StdInvariant.sol";
 // import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-// import { Handler } from "test/fuzz/Handler.t.sol";
+// import { StopOnRevertHandler } from "test/fuzz/failingOnRevert/StopOnRevertHandler.t.sol";
 
-// contract InvariantsTest is StdInvariant, Test {
+// contract StopOnRevertInvariants is StdInvariant, Test {
 //     DeployDSC deployer;
 //     DecentralizedStableCoin dsc;
 //     DSCEngine dsce;
 //     HelperConfig config;
-//     Handler handler;
+//     StopOnRevertHandler handler;
+
 //     address ethUsdPriceFeed;
 //     address btcUsdPriceFeed;
 //     address weth;
@@ -31,12 +36,14 @@
 //     function setUp() public {
 //         deployer = new DeployDSC();
 //         (dsc, dsce, config) = deployer.run();
-//         (,, weth, wbtc,) = config.activeNetworkConfig();
+//         (ethUsdPriceFeed,, weth, wbtc,) = config.activeNetworkConfig();
 
 //         // targetContract(address(dsce));
-//         handler = new Handler(dsce, dsc);
+//         handler = new StopOnRevertHandler(dsce, dsc);
 //         targetContract(address(handler));
 //         //dont call the redeemcollateral unless there is some collateral to redeem
+//         // targetContract(address(ethUsdPriceFeed)); Why can't we just do
+//         // this?//////////////////////////////////////////
 //     }
 
 //     /**
@@ -67,9 +74,9 @@
 //         uint256 wethValue = dsce.getUsdValue(weth, totalWethDeposited);
 //         uint256 wbtcValue = dsce.getUsdValue(wbtc, totalBtcDeposited);
 
-//         // console.log("weth value: ", wethValue);
-//         // console.log("wbtc value: ", wbtcValue);
-//         // console.log("total supply: ", totalSupply);
+//         console.log("weth value: ", wethValue);
+//         console.log("wbtc value: ", wbtcValue);
+//         console.log("total supply: ", totalSupply);
 
 //         assert(wethValue + wbtcValue >= totalSupply);
 //     }
