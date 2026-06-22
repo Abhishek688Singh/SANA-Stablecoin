@@ -7,7 +7,7 @@
 
 pragma solidity ^0.8.19;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 import {DeployDSC} from "script/DeployDSC.s.sol";
 import {DecentralizedStableCoin} from "src/DecentralizedStableCoin.sol";
 import {DSCEngine} from "src/DSCEngine.sol";
@@ -40,9 +40,21 @@ contract InvariantsTest is StdInvariant, Test {
     }
 
     /**
-     * This function will target the handler
-     *  and play with the functions of DSCEngine
-     *  that are written in Handler with some described testing rules
+     * This invariant test targets the Handler contract.
+     *
+     * Foundry will repeatedly call the functions defined in Handler
+     * with random inputs while respecting the guardrails written there.
+     *
+     * After every sequence of calls, this invariant is checked:
+     *
+     *     wethValue + wbtcValue >= totalSupply
+     *
+     * Meaning:
+     * The total USD value of all collateral held by the protocol
+     * must always be greater than or equal to the total DSC supply.
+     *
+     * No matter how many times or in what order the Handler functions
+     * are executed, this condition should always remain true.
      */
     function invariant_protocallMustHaveMoreValueThenTotalSupply() public view {
         //get value of all the collateral in protocall
@@ -55,6 +67,16 @@ contract InvariantsTest is StdInvariant, Test {
         uint256 wethValue = dsce.getUsdValue(weth, totalWethDeposited);
         uint256 wbtcValue = dsce.getUsdValue(wbtc, totalBtcDeposited);
 
+        // console.log("weth value: ", wethValue);
+        // console.log("wbtc value: ", wbtcValue);
+        // console.log("total supply: ", totalSupply);
+
         assert(wethValue + wbtcValue >= totalSupply);
+    }
+
+    function invariant_gettersShouldNotBeRevert() public view {
+        dsce.getLiquidationBonus();
+        dsce.getPrecision();
+        dsce.getCollateralToken();
     }
 }

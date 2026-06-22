@@ -49,7 +49,9 @@ contract DSCEngine is ReentrancyGuard {
     uint256 private constant MIN_HEALTH_FACTOR = 1e18;
     uint256 private constant LIQUIDATION_BONUS = 10; //This means 10%
 
+    /// @dev Mapping of token address to price feed address
     mapping(address token => address priceFeed) private sPriceFeed; //tokenToPriceFeed
+    
     mapping(address user => mapping(address token => uint256 amount)) private sCollateralDeposited;
     mapping(address user => uint256 amountDSCminted) private sDscMinted;
     address[] private sCollateralTokens;
@@ -363,7 +365,23 @@ contract DSCEngine is ReentrancyGuard {
         return _healthFactor(user);
     }
 
-    function getCollateralToken() external view returns(address[] memory){
+    function getCollateralToken() external view returns (address[] memory) {
         return sCollateralTokens;
+    }
+
+    function getCollateralBalanceOfUser(address user, address token) external view returns (uint256) {
+        return sCollateralDeposited[user][token];
+    }
+
+    function getPrecision() external pure returns (uint256) {
+        return PRECISION;
+    }
+
+    function getLiquidationBonus() external pure returns (uint256) {
+        return LIQUIDATION_BONUS;
+    }
+
+    function getCollateralTokenPriceFeed(address token) external view returns (address) {
+        return sPriceFeed[token];
     }
 }
