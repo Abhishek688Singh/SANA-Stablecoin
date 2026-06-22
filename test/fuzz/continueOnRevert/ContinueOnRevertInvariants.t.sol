@@ -78,8 +78,7 @@ contract ContinueOnRevertInvariants is StdInvariant, Test {
         console.log("total supply: ", totalSupply);
 
         assert(wethValue + wbtcValue >= totalSupply);
-
-        }
+    }
 
     /**
      * TODO:function invariant_userCantCreateStablecoinWithPoorHealthFactor() public {}

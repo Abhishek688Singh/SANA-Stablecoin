@@ -8,7 +8,6 @@
 // // TODO: users cant create stablecoins with a bad health factor
 // // TODO: a user should only be able to be liquidated if they have a bad health factor
 
-
 // pragma solidity ^0.8.19;
 
 // import { Test, console } from "forge-std/Test.sol";

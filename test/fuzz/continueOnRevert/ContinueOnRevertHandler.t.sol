@@ -101,4 +101,3 @@ contract ContinueOnRevertHandler is Test {
     }
 }
 
-

@@ -83,7 +83,6 @@ contract StopOnRevertHandler is Test {
      * TODO: write tests for  DecentralizedStableCoin
      */
 
-     
     /////////////////////////////
     //        Aggregator       //
     /////////////////////////////
