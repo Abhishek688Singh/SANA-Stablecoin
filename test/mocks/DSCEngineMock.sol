@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { DecentralizedStableCoin } from "src/DecentralizedStableCoin.sol";
+import { DecentralizedStableCoinMock } from "test/mocks/DecentralizedStableCoinMock.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import { OracleLib } from "src/libraries/OracleLib.sol";
 
 /*
- * @title DSCEngine
+ * @title DSCEngineMock
  * @author Abhishek Singh
  *
  * The system is designed to be as minimal as possible, and have the tokens maintain a 1 token == $1 peg at all times.
@@ -27,7 +27,7 @@ import { OracleLib } from "src/libraries/OracleLib.sol";
  * @notice This contract is based on the MakerDAO DSS system
  */
 
-contract DSCEngine is ReentrancyGuard {
+contract DSCEngineMock is ReentrancyGuard {
     /////////////////
     //   Errors    //
     /////////////////
@@ -36,7 +36,7 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__NotAllowedToken();
     error DSCEngine__TransferFailed();
     error DSCEngine__BreakHealthFactor(uint256 userHealthFactor);
-    error DSCEngine__MintFailed();
+    error DSCEngineMock__MintFailed();
     error DSCEngine__HealthFactorOk();
     error DSCEngine__HealthFactorNotImproved();
 
@@ -61,7 +61,7 @@ contract DSCEngine is ReentrancyGuard {
     mapping(address user => mapping(address token => uint256 amount)) private sCollateralDeposited;
     mapping(address user => uint256 amountDSCminted) private sDscMinted;
     address[] private sCollateralTokens;
-    DecentralizedStableCoin private immutable I_DSC;
+    DecentralizedStableCoinMock private immutable I_DSC;
 
     /////////////////
     //  Events     //
@@ -101,7 +101,7 @@ contract DSCEngine is ReentrancyGuard {
             sPriceFeed[tokenAddresses[i]] = priceFeedAddresses[i];
             sCollateralTokens.push(tokenAddresses[i]);
         }
-        I_DSC = DecentralizedStableCoin(dscAddress);
+        I_DSC = DecentralizedStableCoinMock(dscAddress);
     }
 
     //////////////////////////
@@ -185,7 +185,7 @@ contract DSCEngine is ReentrancyGuard {
         _revertIfHealthFactorBroken(msg.sender);
 
         bool minted = I_DSC.mint(msg.sender, amountDscToMint);
-        if (!minted) revert DSCEngine__MintFailed();
+        if (!minted) revert DSCEngineMock__MintFailed();
     }
 
     function burnDsc(uint256 amount) public moreThenZero(amount) {

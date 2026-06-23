@@ -1,15 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import { Test } from "forge-std/Test.sol";
+import { Test, console } from "forge-std/Test.sol";
 import { DeployDSC } from "script/DeployDSC.s.sol";
 import { DecentralizedStableCoin } from "src/DecentralizedStableCoin.sol";
 import { DSCEngine } from "src/DSCEngine.sol";
 import { HelperConfig } from "script/HelperConfig.s.sol";
 import { ERC20Mock } from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
+import { DecentralizedStableCoinMock } from "test/mocks/DecentralizedStableCoinMock.sol";
+import { DSCEngineMock } from "test/mocks/DSCEngineMock.sol";
 
-// test name pattern
-// test<Action>Reverts<Condition>
+/**
+ * test name pattern
+ * test<Action>Reverts<Condition>
+ *
+ * Make every other condition valid.
+ *
+ * Break only the condition you want to test.
+ */
 
 contract DSCEngineTest is Test {
     DeployDSC deployer;
@@ -134,11 +142,6 @@ contract DSCEngineTest is Test {
         // vm.stopPrank();
     }
 
-    /**
-     * Make every other condition valid.
-     *
-     * Break only the condition you want to test.
-     */
     function testMintWithZeroRevertsNeedsMoreThenZero() public {
         vm.startPrank(nitesh);
         //Arrange
@@ -156,5 +159,111 @@ contract DSCEngineTest is Test {
         vm.stopPrank();
     }
 
+    function testUserDepositedEnoughCollateralAndMintCorrectly() public depositCollateral {
+        //Arrange
+        uint256 depositedCollateralInUsd = dsce.getAccountCollateralValue(nitesh);
+        uint256 maxMintableAmountOfDsc = depositedCollateralInUsd / 2;
+
+        //Act
+        vm.startPrank(nitesh);
+        dsce.mintDsc(maxMintableAmountOfDsc);
+        vm.stopPrank();
+        (uint256 totalDscMinted, uint256 collateralValueInUsd) = dsce.getAccountInformation(nitesh);
+
+        //Assert
+        assertEq(totalDscMinted, maxMintableAmountOfDsc);
+        assertEq(collateralValueInUsd, depositedCollateralInUsd);
+    }
+
+    function testMintDscAtHealthFactorBoundary() public depositCollateral {
+        //Arrange
+        uint256 LIQUIDATION_THRESHOLD = dsce.getLiquidationThreshold();
+        uint256 LIQUIDATION_PRECISION = dsce.getLiquidationPrecision();
+        uint256 PRECISION = dsce.getPrecision();
+        uint256 minHealthFactor = dsce.getMinHealthFactor();
+        (, uint256 collateralValueInUsd) = dsce.getAccountInformation(nitesh);
+
+        //Act
+        uint256 collateralAdjustedForThreshold = (collateralValueInUsd * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
+
+        uint256 maxDscCanBeMintedBeforeBreakingHealthFactor =
+            (collateralAdjustedForThreshold * PRECISION) / minHealthFactor;
+
+        vm.startPrank(nitesh);
+        dsce.mintDsc(maxDscCanBeMintedBeforeBreakingHealthFactor);
+        vm.stopPrank();
+
+        (uint256 totalDscMinted,) = dsce.getAccountInformation(nitesh);
+        uint256 userCurrentHealthFactor = dsce.getHealthFactor(nitesh);
+
+        //Assert
+        assertEq(userCurrentHealthFactor, minHealthFactor);
+        assertEq(totalDscMinted, maxDscCanBeMintedBeforeBreakingHealthFactor);
+        assertEq(dsc.balanceOf(nitesh), maxDscCanBeMintedBeforeBreakingHealthFactor);
+    }
+
+    function testMintDscJustAboveTheHealthFactorBoundaryRevertsBreakHealthFactor() public depositCollateral {
+        //Arrange
+        uint256 LIQUIDATION_THRESHOLD = dsce.getLiquidationThreshold();
+        uint256 LIQUIDATION_PRECISION = dsce.getLiquidationPrecision();
+        uint256 PRECISION = dsce.getPrecision();
+        uint256 minHealthFactor = dsce.getMinHealthFactor();
+        (, uint256 collateralValueInUsd) = dsce.getAccountInformation(nitesh);
+
+        //Act + Assert
+        uint256 collateralAdjustedForThreshold = (collateralValueInUsd * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
+
+        uint256 maxDscCanBeMintedBeforeBreakingHealthFactor =
+            (collateralAdjustedForThreshold * PRECISION) / minHealthFactor;
+
+        uint256 expectedHealthFactor =
+            dsce.calculateHealthFactor(maxDscCanBeMintedBeforeBreakingHealthFactor + 1, collateralValueInUsd);
+        vm.startPrank(nitesh);
+        vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCEngine__BreakHealthFactor.selector, expectedHealthFactor));
+        dsce.mintDsc(maxDscCanBeMintedBeforeBreakingHealthFactor + 1); //+1 is to go just above the hf boundary
+        vm.stopPrank();
+    }
+
+    function testMintDscFailRevertsMintFailed()
+        public /**
+         * depositCollateral : we dont use this modifier because it doposit collateral in dsce contract
+         */
+
+    {
+        ///////////////////////Arrange
+        tokenAddresses = [weth];
+        priceFeedAddresses = [ethUsdPriceFeed];
+
+        //Deploy mocks
+        //Now the owner of dscMock and dsceMock is address(this) : the test contract itself
+        DecentralizedStableCoinMock dscMock = new DecentralizedStableCoinMock();
+        DSCEngineMock dsceMock = new DSCEngineMock(tokenAddresses, priceFeedAddresses, address(dscMock));
+
+        //But in the workflow, the owner of dscMock should be dsceMock OR
+        //the dscMock is owned by dsceMock OR
+        //the mint function is controlled by dsceMock by onlyOwner modifier
+        //so we have to transfer the ownership of dscMock to dsceMock from address(this):test contract
+        dscMock.transferOwnership(address(dsceMock));
+
+        ///////////////////////Act + Assert
+        //Fund the mock user so that user have collateral to mint dscMock
+        vm.startPrank(nitesh);
+        ERC20Mock(weth).approve(address(dsceMock), STARTING_BALANCE);
+        dsceMock.depositCollateral(weth, STARTING_BALANCE);
+
+        vm.expectRevert(DSCEngineMock.DSCEngineMock__MintFailed.selector);
+        dsceMock.mintDsc(AMOUNT_DSC_TO_MINT);
+        vm.stopPrank();
+    }
+
     // TODO: increase the test coverage upto 85%
+    /////////////////////////////////////
+    //      RedeemCollateral test      //
+    /////////////////////////////////////
+
+    // function testRedeemCollateralReverts
+
+    ///////////////////////////////////
+    //        burnDsc Tests          //
+    ///////////////////////////////////
 }
